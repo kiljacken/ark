@@ -1,12 +1,25 @@
 language: go
 
-# probably wont work
-script:
+# which go versions do we target?
+go:
+ - tip
+
+before_install:
+ - sudo sh -c "echo 'deb http://llvm.org/apt/precise/ llvm-toolchain-precise-3.6-binaries main' >> /etc/apt/sources.list"
+ - wget -O - http://llvm.org/apt/llvm-snapshot.gpg.key | sudo apt-key add -
+
+# install is for dependencies
+install:
+ - sudo apt-get update -qq
+ - sudo apt-get install -qq llvm-3.6
  - svn co https://llvm.org/svn/llvm-project/llvm/tags/RELEASE_360/final $GOPATH/src/llvm.org/llvm
  - export CGO_CPPFLAGS="`llvm-config --cppflags`"
  - export CGO_LDFLAGS="`llvm-config --ldflags --libs --system-libs all`"
  - export CGO_CXXFLAGS=-std=c++11
  - go install -tags byollvm llvm.org/llvm/bindings/go/llvm
+
+# our stuff goes here
+script:
  - go get github.com/ark-lang/ark
  - go install github.com/ark-lang/ark
  - ./test.py
