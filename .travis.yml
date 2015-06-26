@@ -10,9 +10,9 @@ before_install:
 
 # install is for dependencies
 install:
+ - llvm-config version
  - sudo apt-get update
- - yes | sudo apt-get upgrade
- - sudo apt-get install llvm-3.6 llvm-3.6-dev
+ - sudo apt-get upgrade llvm-3.6
  - svn co https://llvm.org/svn/llvm-project/llvm/tags/RELEASE_360/final $GOPATH/src/llvm.org/llvm
  - export CGO_CPPFLAGS="`llvm-config --cppflags`"
  - export CGO_LDFLAGS="`llvm-config --ldflags --libs --system-libs all`"
