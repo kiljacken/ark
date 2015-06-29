@@ -1,6 +1,8 @@
 package parser
 
-import "github.com/ark-lang/ark/util"
+import (
+	"github.com/ark-lang/ark/util"
+)
 
 type Type interface {
 	TypeName() string
@@ -11,6 +13,7 @@ type Type interface {
 	IsSigned() bool           // true for all signed integer types
 	CanCastTo(Type) bool      // true if the receiver can be typecast to the parameter
 	Attrs() []*Attr           // fetches the attributes associated with the type
+	Equals(Type) bool         // compares whether two types are equal
 }
 
 //go:generate stringer -type=PrimitiveType
@@ -94,6 +97,14 @@ func (v PrimitiveType) Attrs() []*Attr {
 	return nil
 }
 
+func (v PrimitiveType) Equals(t Type) bool {
+	other, ok := t.(PrimitiveType)
+	if !ok {
+		return false
+	}
+	return v == other
+}
+
 // StructType
 
 type StructType struct {
@@ -169,6 +180,21 @@ func (v *StructType) Attrs() []*Attr {
 	return v.attrs
 }
 
+func (v *StructType) Equals(t Type) bool {
+	// TODO: Check attributes
+	other, ok := t.(*StructType)
+	if !ok {
+		return false
+	}
+
+	if v.Name != other.Name {
+		return false
+	}
+
+	// TODO: Check struct members
+	return true
+}
+
 // ArrayType
 
 type ArrayType struct {
@@ -222,6 +248,15 @@ func (v ArrayType) CanCastTo(t Type) bool {
 
 func (v ArrayType) Attrs() []*Attr {
 	return v.attrs
+}
+
+func (v ArrayType) Equals(t Type) bool {
+	// TODO: Check attributes
+	other, ok := t.(ArrayType)
+	if !ok {
+		return false
+	}
+	return v.MemberType.Equals(other.MemberType)
 }
 
 // TraitType
@@ -289,6 +324,21 @@ func (v *TraitType) Attrs() []*Attr {
 	return v.attrs
 }
 
+func (v *TraitType) Equals(t Type) bool {
+	// TODO: CHeck traits
+	other, ok := t.(*TraitType)
+	if !ok {
+		return false
+	}
+
+	if v.Name != other.Name {
+		return false
+	}
+
+	// TODO: Check for trait equality
+	return true
+}
+
 // PointerType
 
 type PointerType struct {
@@ -333,4 +383,91 @@ func (v PointerType) Attrs() []*Attr {
 
 func (v PointerType) IsSigned() bool {
 	return false
+}
+
+func (v PointerType) Equals(t Type) bool {
+	other, ok := t.(PointerType)
+	if !ok {
+		return false
+	}
+	return v == other
+}
+
+// TupleType
+
+type TupleType struct {
+	Components []Type
+}
+
+func (v *TupleType) String() string {
+	result := "(" + util.Blue("TupleType") + ": "
+	for _, comp := range v.Components {
+		result += "\t" + comp.TypeName() + "\n"
+	}
+	return result + ")"
+}
+
+func (v *TupleType) TypeName() string {
+	result := "|"
+	for idx, comp := range v.Components {
+		result += comp.TypeName()
+
+		// if we are not at the last component
+		if idx < len(v.Components)-1 {
+			result += ", "
+		}
+	}
+	result += "|"
+	return result
+}
+
+func (v *TupleType) RawType() Type {
+	return v
+}
+
+func (v *TupleType) IsSigned() bool {
+	return false
+}
+
+func (v *TupleType) LevelsOfIndirection() int {
+	return 0
+}
+
+func (v *TupleType) IsIntegerType() bool {
+	return false
+}
+
+func (v *TupleType) IsFloatingType() bool {
+	return false
+}
+
+func (v *TupleType) CanCastTo(t Type) bool {
+	return false
+}
+
+func (v *TupleType) addComponent(decl Type) {
+	v.Components = append(v.Components, decl)
+}
+
+func (v *TupleType) Attrs() []*Attr {
+	return nil
+}
+
+func (v *TupleType) Equals(t Type) bool {
+	other, ok := t.(*TupleType)
+	if !ok {
+		return false
+	}
+
+	if len(v.Components) != len(other.Components) {
+		return false
+	}
+
+	for idx, comp := range v.Components {
+		if comp != other.Components[idx] {
+			return false
+		}
+	}
+
+	return true
 }

@@ -1,3 +1,9 @@
+func something(): |int, f64| {
+    x := |4, 2.3|; // inferred
+    y: |int, f64| = |3, 2.4|;
+    return |0, 3.4|;
+}
+
 func main() {
-    x :int = |1, 15|;
+    x := something();
 }

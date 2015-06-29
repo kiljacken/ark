@@ -657,7 +657,7 @@ type TupleLiteral struct {
 	// a tuple from array, after all! Till then I can't
 	// do any codegen for this, but it generates to a structure
 	// with X amount of values and their respective types.
-	Type Type
+	Type *TupleType
 }
 
 func (v *TupleLiteral) exprNode() {}
