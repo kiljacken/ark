@@ -13,5 +13,5 @@ func main(): int {
 
     printf("%d %f\n", x|0|, x|1|);
 
-    return y;
+    return y + 2;
 }
