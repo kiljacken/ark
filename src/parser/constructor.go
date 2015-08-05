@@ -239,7 +239,7 @@ func (v *TypeDeclNode) construct(c *Constructor) Node {
 		NamedType: namedType,
 	}
 
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 
 	return res
 }
@@ -254,7 +254,7 @@ func (v *UseDeclNode) construct(c *Constructor) Node {
 	res.ModuleName = v.Module.Name.Value
 	res.Scope = c.scope
 	c.useModule(res.ModuleName)
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -371,7 +371,7 @@ func (v *FunctionDeclNode) construct(c *Constructor) Node {
 		}
 	}
 
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -451,21 +451,21 @@ func (v *VarDeclNode) construct(c *Constructor) Node {
 	if v.Value != nil {
 		res.Assignment = c.constructExpr(v.Value)
 	}
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
 func (v *DeferStatNode) construct(c *Constructor) Node {
 	res := &DeferStat{}
 	res.Call = c.constructExpr(v.Call).(*CallExpr) // TODO: Error message
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
 func (v *DefaultStatNode) construct(c *Constructor) Node {
 	res := &DefaultStat{}
 	res.Target = c.constructExpr(v.Target).(AccessExpr)
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -478,7 +478,7 @@ func (v *IfStatNode) construct(c *Constructor) Node {
 	if v.ElseBody != nil {
 		res.Else = c.constructNode(v.ElseBody).(*Block) // TODO: Error message
 	}
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -487,24 +487,17 @@ func (v *MatchStatNode) construct(c *Constructor) Node {
 	res.Target = c.constructExpr(v.Value)
 	res.Branches = make(map[Expr]Node)
 	for _, branch := range v.Cases {
-		var pattern Expr
-		if dpn, ok := branch.Pattern.(*DefaultPatternNode); ok {
-			pattern = &DefaultMatchBranch{}
-			pattern.setPos(dpn.Where().Start())
-		} else {
-			pattern = c.constructExpr(branch.Pattern)
-		}
-
+		pattern := c.constructExpr(branch.Pattern)
 		body := c.constructNode(branch.Body)
 		res.Branches[pattern] = body
 	}
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
-func (v *DefaultPatternNode) construct(c *Constructor) Node {
+func (v *DefaultPatternNode) construct(c *Constructor) Expr {
 	res := &DefaultMatchBranch{}
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -517,7 +510,7 @@ func (v *LoopStatNode) construct(c *Constructor) Node {
 		res.LoopType = LOOP_TYPE_INFINITE
 	}
 	res.Body = c.constructNode(v.Body).(*Block) // TODO: Error message
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -526,14 +519,14 @@ func (v *ReturnStatNode) construct(c *Constructor) Node {
 	if v.Value != nil {
 		res.Value = c.constructExpr(v.Value)
 	}
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
 func (v *BlockStatNode) construct(c *Constructor) Node {
 	res := &BlockStat{}
 	res.Block = c.constructNode(v.Body).(*Block) // TODO: Error message
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -551,7 +544,7 @@ func (v *BlockNode) construct(c *Constructor) Node {
 	if !v.NonScoping {
 		c.popScope()
 	}
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 
 	c.nameMap = c.nameMap.parent
 	return res
@@ -560,7 +553,7 @@ func (v *BlockNode) construct(c *Constructor) Node {
 func (v *CallStatNode) construct(c *Constructor) Node {
 	res := &CallStat{}
 	res.Call = c.constructExpr(v.Call).(*CallExpr)
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -568,7 +561,7 @@ func (v *AssignStatNode) construct(c *Constructor) Node {
 	res := &AssignStat{}
 	res.Access = c.constructExpr(v.Target).(AccessExpr) // TODO: Error message
 	res.Assignment = c.constructExpr(v.Value)
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -577,7 +570,7 @@ func (v *BinopAssignStatNode) construct(c *Constructor) Node {
 	res.Access = c.constructExpr(v.Target).(AccessExpr) // TODO: Error message
 	res.Operator = v.Operator
 	res.Assignment = c.constructExpr(v.Value)
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -586,7 +579,7 @@ func (v *BinaryExprNode) construct(c *Constructor) Expr {
 	res.Lhand = c.constructExpr(v.Lhand)
 	res.Rhand = c.constructExpr(v.Rhand)
 	res.Op = v.Operator
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -620,21 +613,21 @@ func (v *SizeofExprNode) construct(c *Constructor) Expr {
 	} else if v.Type != nil {
 		res.Type = c.constructType(v.Type)
 	}
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
 func (v *DefaultExprNode) construct(c *Constructor) Expr {
 	res := &DefaultExpr{}
 	res.Type = c.constructType(v.Target)
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
 func (v *AddrofExprNode) construct(c *Constructor) Expr {
 	res := &AddressOfExpr{}
 	res.Access = c.constructExpr(v.Value)
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -642,7 +635,7 @@ func (v *CastExprNode) construct(c *Constructor) Expr {
 	res := &CastExpr{}
 	res.Type = c.constructType(v.Type)
 	res.Expr = c.constructExpr(v.Value)
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -665,7 +658,7 @@ func (v *UnaryExprNode) construct(c *Constructor) Expr {
 		}
 	}
 
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -678,7 +671,7 @@ func (v *CallExprNode) construct(c *Constructor) Expr {
 				Arguments:      c.constructExprs(v.Arguments),
 				functionSource: c.constructExpr(v.Function),
 			}
-			res.setPos(v.Where().Start())
+			res.setPos(v.Where())
 			return res
 		} else if typ == NODE_ENUM_MEMBER {
 			res := &EnumLiteral{
@@ -686,7 +679,7 @@ func (v *CallExprNode) construct(c *Constructor) Expr {
 				Type:         &UnresolvedType{Name: toParentName(van.Name)},
 				TupleLiteral: &TupleLiteral{Members: c.constructExprs(v.Arguments)},
 			}
-			res.setPos(v.Where().Start())
+			res.setPos(v.Where())
 			return res
 		} else if typ.IsType() {
 			if len(v.Arguments) > 1 {
@@ -697,7 +690,7 @@ func (v *CallExprNode) construct(c *Constructor) Expr {
 				Type: c.constructType(&TypeReferenceNode{Reference: van.Name}),
 				Expr: c.constructExpr(v.Arguments[0]),
 			}
-			res.setPos(v.Where().Start())
+			res.setPos(v.Where())
 			return res
 		} else {
 			log.Debugln("constructor", "`%s` was a `%s`", van.Name.Name.Value, typ)
@@ -712,7 +705,7 @@ func (v *CallExprNode) construct(c *Constructor) Expr {
 
 		res.ReceiverAccess = sae.construct(c).(*StructAccessExpr).Struct
 
-		res.setPos(v.Where().Start())
+		res.setPos(v.Where())
 		return res
 	} else {
 		c.err(van.Name.Name.Where, "Can't call function on this")
@@ -725,12 +718,12 @@ func (v *VariableAccessNode) construct(c *Constructor) Expr {
 		res := &EnumLiteral{}
 		res.Member = v.Name.Name.Value
 		res.Type = &UnresolvedType{Name: toParentName(v.Name)}
-		res.setPos(v.Where().Start())
+		res.setPos(v.Where())
 		return res
 	} else {
 		res := &VariableAccessExpr{}
 		res.Name = toUnresolvedName(v.Name)
-		res.setPos(v.Where().Start())
+		res.setPos(v.Where())
 		return res
 	}
 }
@@ -739,7 +732,7 @@ func (v *StructAccessNode) construct(c *Constructor) Expr {
 	res := &StructAccessExpr{}
 	res.Struct = c.constructExpr(v.Struct).(AccessExpr) // TODO: Error message
 	res.Member = v.Member.Value
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -747,7 +740,7 @@ func (v *ArrayAccessNode) construct(c *Constructor) Expr {
 	res := &ArrayAccessExpr{}
 	res.Array = c.constructExpr(v.Array).(AccessExpr) // TODO: Error message
 	res.Subscript = c.constructExpr(v.Index)
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -755,14 +748,14 @@ func (v *TupleAccessNode) construct(c *Constructor) Expr {
 	res := &TupleAccessExpr{}
 	res.Tuple = c.constructExpr(v.Tuple).(AccessExpr) // TODO: Error message
 	res.Index = uint64(v.Index)
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
 func (v *ArrayLiteralNode) construct(c *Constructor) Expr {
 	res := &ArrayLiteral{}
 	res.Members = c.constructExprs(v.Values)
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -772,7 +765,7 @@ func (v *TupleLiteralNode) construct(c *Constructor) Expr {
 	if len(res.Members) == 1 {
 		return res.Members[0]
 	}
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -785,6 +778,7 @@ func (v *StructLiteralNode) construct(c *Constructor) Expr {
 	for idx, member := range v.Members {
 		res.Values[member.Value] = c.constructExpr(v.Values[idx])
 	}
+	res.setPos(v.Where())
 
 	if v.Name == nil {
 		return res
@@ -793,7 +787,7 @@ func (v *StructLiteralNode) construct(c *Constructor) Expr {
 		enum.Member = v.Name.Name.Value
 		enum.Type = &UnresolvedType{Name: toParentName(v.Name)}
 		enum.StructLiteral = res
-		enum.setPos(v.Where().Start())
+		enum.setPos(v.Where())
 		return enum
 	} else {
 		log.Debugln("constructor", "`%s` was a `%s`", v.Name.Name.Value, typ)
@@ -805,7 +799,7 @@ func (v *StructLiteralNode) construct(c *Constructor) Expr {
 func (v *BoolLitNode) construct(c *Constructor) Expr {
 	res := &BoolLiteral{}
 	res.Value = v.Value
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
@@ -824,7 +818,7 @@ func (v *NumberLitNode) construct(c *Constructor) Expr {
 		res.Type = PRIMITIVE_f128
 	}
 
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 
 }
@@ -832,14 +826,14 @@ func (v *NumberLitNode) construct(c *Constructor) Expr {
 func (v *StringLitNode) construct(c *Constructor) Expr {
 	res := &StringLiteral{}
 	res.Value = v.Value
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 
 func (v *RuneLitNode) construct(c *Constructor) Expr {
 	res := &RuneLiteral{}
 	res.Value = v.Value
-	res.setPos(v.Where().Start())
+	res.setPos(v.Where())
 	return res
 }
 

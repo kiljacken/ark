@@ -40,10 +40,16 @@ func NewSourcefile(filepath string) (*Sourcefile, error) {
 }
 
 func (s *Sourcefile) GetLine(line int) string {
+	if line <= 0 || line >= len(s.NewLines) {
+		return ""
+	}
 	return string(s.Contents[s.NewLines[line]+1 : s.NewLines[line+1]])
 }
 
 const TabWidth = 4
+
+var TabSpace = strings.Repeat(" ", TabWidth)
+var TabMark = strings.Repeat("~", TabWidth)
 
 func (s *Sourcefile) MarkPos(pos Position) string {
 	buf := new(bytes.Buffer)
@@ -52,16 +58,12 @@ func (s *Sourcefile) MarkPos(pos Position) string {
 	lineStringRunes := []rune(lineString)
 	pad := pos.Char - 1
 
-	buf.WriteString(strings.Replace(strings.Replace(lineString, "%", "%%", -1), "\t", "    ", -1))
+	buf.WriteString(strings.Replace(lineString, "\t", TabSpace, -1))
 	buf.WriteRune('\n')
 	for i := 0; i < pad; i++ {
-		spaces := 1
-
 		if lineStringRunes[i] == '\t' {
-			spaces = TabWidth
-		}
-
-		for t := 0; t < spaces; t++ {
+			buf.WriteString(TabSpace)
+		} else {
 			buf.WriteRune(' ')
 		}
 	}
@@ -69,7 +71,6 @@ func (s *Sourcefile) MarkPos(pos Position) string {
 	buf.WriteRune('\n')
 
 	return buf.String()
-
 }
 
 func (s *Sourcefile) MarkSpan(span Span) string {
@@ -96,22 +97,18 @@ func (s *Sourcefile) MarkSpan(span Span) string {
 
 		var length int
 		if line == span.EndLine {
-			length = span.EndChar - span.StartChar
+			length = span.EndChar - pad - 1
 		} else {
-			length = len(lineStringRunes)
+			length = len(lineStringRunes) - pad
 		}
 
-		buf.WriteString(strings.Replace(strings.Replace(lineString, "%", "%%", -1), "\t", "    ", -1))
+		buf.WriteString(strings.Replace(lineString, "\t", TabSpace, -1))
 		buf.WriteRune('\n')
 
 		for i := 0; i < pad; i++ {
-			spaces := 1
-
 			if lineStringRunes[i] == '\t' {
-				spaces = TabWidth
-			}
-
-			for t := 0; t < spaces; t++ {
+				buf.WriteString(TabSpace)
+			} else {
 				buf.WriteRune(' ')
 			}
 		}
@@ -119,13 +116,9 @@ func (s *Sourcefile) MarkSpan(span Span) string {
 		buf.WriteString(util.TEXT_GREEN + util.TEXT_BOLD)
 		for i := 0; i < length; i++ {
 			// there must be a less repetitive way to do this but oh well
-			spaces := 1
-
 			if lineStringRunes[i+pad] == '\t' {
-				spaces = TabWidth
-			}
-
-			for t := 0; t < spaces; t++ {
+				buf.WriteString(TabMark)
+			} else {
 				buf.WriteRune('~')
 			}
 		}

@@ -32,7 +32,7 @@ func (v *AttributeCheck) Visit(s *SemanticAnalyzer, n parser.Node) {
 }
 
 func (v *AttributeCheck) CheckFunctionDecl(s *SemanticAnalyzer, n *parser.FunctionDecl) {
-	v.CheckAttrsDistanceFromLine(s, n.Function.Attrs, n.Pos().Line, "function", n.Function.Name)
+	v.CheckAttrsDistanceFromLine(s, n.Function.Attrs, n.Pos().StartLine, "function", n.Function.Name)
 
 	for _, attr := range n.Function.Attrs {
 		switch attr.Key {
@@ -71,7 +71,7 @@ func (v *AttributeCheck) CheckStructType(s *SemanticAnalyzer, n *parser.StructTy
 }*/
 
 func (v *AttributeCheck) CheckVariableDecl(s *SemanticAnalyzer, n *parser.VariableDecl) {
-	v.CheckAttrsDistanceFromLine(s, n.Variable.Attrs, n.Pos().Line, "variable", n.Variable.Name)
+	v.CheckAttrsDistanceFromLine(s, n.Variable.Attrs, n.Pos().StartLine, "variable", n.Variable.Name)
 
 	for _, attr := range n.Variable.Attrs {
 		switch attr.Key {
@@ -90,7 +90,7 @@ func (v *AttributeCheck) CheckAttrsDistanceFromLine(s *SemanticAnalyzer, attrs p
 	for _, attr := range attrs {
 		index := 0
 		for idx, innerAttr := range sorted {
-			if attr.Pos().Line >= innerAttr.Pos().Line {
+			if attr.Pos().StartLine >= innerAttr.Pos().StartLine {
 				index = idx
 			}
 		}
@@ -101,12 +101,12 @@ func (v *AttributeCheck) CheckAttrsDistanceFromLine(s *SemanticAnalyzer, attrs p
 	}
 
 	for i := len(sorted) - 1; i >= 0; i-- {
-		if sorted[i].Pos().Line < line-1 {
+		if sorted[i].Pos().StartLine < line-1 {
 			// mute warnings from attribute blocks
 			if !sorted[i].FromBlock {
-				s.Warn(sorted[i], "Gap of %d lines between declaration of %s `%s` and `%s` attribute", line-sorted[i].Pos().Line, declType, declName, sorted[i].Key)
+				s.Warn(sorted[i], "Gap of %d lines between declaration of %s `%s` and `%s` attribute", line-sorted[i].Pos().StartLine, declType, declName, sorted[i].Key)
 			}
 		}
-		line = sorted[i].Pos().Line
+		line = sorted[i].Pos().StartLine
 	}
 }

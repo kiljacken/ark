@@ -136,12 +136,23 @@ func build(files []string, outputFile string, cg string, ccArgs []string, output
 			inf.Infer(modules)
 
 			// Dump AST
-			log.Debugln("main", "AST of module `%s`:", module.Name)
+			/*log.Debugln("main", "AST of module `%s`:", module.Name)
 			for _, node := range module.Nodes {
 				log.Debugln("main", "%s", node.String())
-			}
+			}*/
 		}
 	})
+
+	log.Timed("new inference phase", func() {
+		// TODO: We're looping over a map, the order we get is thus random
+		for _, module := range modules {
+			inf := parser.NewInferer_(module)
+			vis := parser.NewASTVisitor(inf)
+			vis.VisitModule(module)
+		}
+	})
+
+	return
 
 	// semantic analysis
 	log.Timed("semantic analysis phase", func() {

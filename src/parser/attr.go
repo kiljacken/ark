@@ -79,12 +79,11 @@ func (v *parser) parseAttrs() AttrGroup {
 	ret := make(AttrGroup)
 	for v.tokenMatches(0, lexer.TOKEN_SEPARATOR, "[") {
 		// eat the opening bracket
-		v.consumeToken()
+		startToken := v.consumeToken()
 	thing:
 		attr := &Attr{
 			Key: v.consumeToken().Contents,
 		}
-		attr.setPos(v.peek(0).Where.Start())
 
 		if v.tokenMatches(0, lexer.TOKEN_OPERATOR, "=") {
 			v.consumeToken() // eat =
@@ -108,7 +107,8 @@ func (v *parser) parseAttrs() AttrGroup {
 		}
 
 		// eat the closing bracket
-		v.consumeToken()
+		endToken := v.consumeToken()
+		attr.setPos(lexer.NewSpanFromTokens(startToken, endToken))
 
 		if ret.Set(attr.Key, attr) {
 			v.err("Duplicate attribute `%s`", attr.Key)

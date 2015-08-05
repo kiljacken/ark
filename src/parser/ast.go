@@ -10,8 +10,8 @@ import (
 )
 
 type Locatable interface {
-	Pos() lexer.Position
-	setPos(pos lexer.Position)
+	Pos() lexer.Span
+	setPos(pos lexer.Span)
 }
 
 type Node interface {
@@ -49,14 +49,14 @@ type Documentable interface {
 
 // an implementation of Locatable that is used for Nodes
 type nodePos struct {
-	pos lexer.Position
+	pos lexer.Span
 }
 
-func (v nodePos) Pos() lexer.Position {
+func (v nodePos) Pos() lexer.Span {
 	return v.pos
 }
 
-func (v *nodePos) setPos(pos lexer.Position) {
+func (v *nodePos) setPos(pos lexer.Span) {
 	v.pos = pos
 }
 

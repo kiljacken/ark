@@ -221,7 +221,7 @@ func (v *parser) parseAttributes() AttrGroup {
 			attr := &Attr{}
 
 			keyToken := v.expect(lexer.TOKEN_IDENTIFIER, "")
-			attr.setPos(keyToken.Where.Start())
+			attr.setPos(keyToken.Where)
 			attr.Key = keyToken.Contents
 
 			if v.tokenMatches(0, lexer.TOKEN_OPERATOR, "=") {
@@ -1271,7 +1271,7 @@ func (v *parser) parseBinaryOperator(upperPrecedence int, lhand ParseNode) Parse
 			Rhand:    rhand,
 			Operator: typ,
 		}
-		temp.SetWhere(lexer.NewSpan(lhand.Where().Start(), rhand.Where().Start()))
+		temp.SetWhere(lexer.NewSpan(lhand.Where().Start(), rhand.Where().End()))
 		lhand = temp
 	}
 }
