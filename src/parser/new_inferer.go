@@ -2,8 +2,37 @@ package parser
 
 import (
 	"fmt"
+	"github.com/ark-lang/ark/src/util"
 	"github.com/ark-lang/ark/src/util/log"
 )
+
+type TypeVariable struct {
+	MetaType
+	Id int
+}
+
+func (v *TypeVariable) Equals(other Type) bool {
+	if ot, ok := other.(*TypeVariable); ok {
+		return v.Id == ot.Id
+	}
+	return false
+}
+
+func (v *TypeVariable) String() string {
+	return "(" + util.Blue("TypeVariable") + ": " + v.TypeName() + ")"
+}
+
+func (v *TypeVariable) TypeName() string {
+	return fmt.Sprintf("$%d", v.Id)
+}
+
+func (v *TypeVariable) ActualType() Type {
+	return v
+}
+
+func (v *TypeVariable) resolveType(src Locatable, res *Resolver, s *Scope) Type {
+	panic("TypeVariable encountered in resolve")
+}
 
 type AnnotatedExpr struct {
 	Expr Expr
@@ -15,8 +44,6 @@ type SideType int
 const (
 	IdentSide SideType = iota
 	TypeSide
-	PointerSide
-	DerefSide
 )
 
 type Side struct {
@@ -26,21 +53,44 @@ type Side struct {
 }
 
 func (v *Side) Subs(id int, left *Side) {
-	if v.SideType == IdentSide {
+	switch v.SideType {
+	case IdentSide:
 		if v.Id == id {
 			*v = *left
 		}
-	} else if v.SideType == PointerSide {
-		if v.Id == id {
-			if left.SideType == TypeSide {
-				*v = *left
-				v.Type = pointerTo(v.Type)
-			} else {
-				v.Id = left.Id
-			}
+
+	case TypeSide:
+		v.Type
+
+	default:
+		panic("Invalid SideType")
+	}
+}
+
+func SubsType(typ Type, id int, left *Side) Type {
+	visited := make(map[Type]bool)
+
+	for {
+		switch typ {
+		case *NamedType:
+			nt := typ.(*NamedType)
+			nt.Type = SubsType(nt.Type, id, left)
+
+		case PointerType:
+			pt := typ.(PointerType)
+			pt.Addressee = SubsType(pt.Addressee, id, left)
+
+		case ArrayType:
+			at := typ.(ArrayType)
+		case *StructType:
+			st := typ.(*StructType)
+		case *TupleType:
+			tt := typ.(*TupleType)
+		case *TypeVariable:
 		}
 	}
 
+	return typ
 }
 
 func (v *Side) String() string {
@@ -49,10 +99,6 @@ func (v *Side) String() string {
 		return fmt.Sprintf("$%d", v.Id)
 	case TypeSide:
 		return fmt.Sprintf("type `%s`", v.Type.TypeName())
-	case PointerSide:
-		return fmt.Sprintf("&$%d", v.Id)
-	case DerefSide:
-		return fmt.Sprintf("^$%d", v.Id)
 	}
 	panic("Invalid side type")
 }
@@ -95,22 +141,6 @@ func (v *NewInferer) AddEqualsConstraint(a, b int) {
 	v.AddConstraint(c)
 }
 
-func (v *NewInferer) AddPointerConstraint(a, b int) {
-	c := &Constraint{
-		Left:  &Side{Id: a, SideType: IdentSide},
-		Right: &Side{Id: b, SideType: PointerSide},
-	}
-	v.AddConstraint(c)
-}
-
-func (v *NewInferer) AddDerefConstraint(a, b int) {
-	c := &Constraint{
-		Left:  &Side{Id: a, SideType: IdentSide},
-		Right: &Side{Id: b, SideType: DerefSide},
-	}
-	v.AddConstraint(c)
-}
-
 func (v *NewInferer) AddIsConstraint(id int, typ Type) {
 	c := &Constraint{
 		Left:  &Side{Id: id, SideType: IdentSide},
@@ -138,7 +168,7 @@ func (v *NewInferer) Unify() []*Substitution {
 		if left.SideType == right.SideType {
 			var equal bool
 			switch left.SideType {
-			case IdentSide, PointerSide, DerefSide:
+			case IdentSide:
 				equal = (left.Id == right.Id)
 
 			case TypeSide:
@@ -187,7 +217,7 @@ func (v *NewInferer) Unify() []*Substitution {
 		// has the same constructor), then push X_i = Y_i for all 1 ≤ i ≤ n onto the stack.
 
 		// 5. Otherwise, X and Y do not unify. Report an error.
-		log.Errorln("inferer", "Constraint did not unify. This is an error")
+		log.Errorln("inferer", "Constraint did not unify. This is an error (%s)", element)
 	}
 
 	return substitutions
@@ -344,7 +374,7 @@ func (v *NewInferer) HandleExpr(expr Expr) int {
 			v.AddEqualsConstraint(ann.Id, id)
 
 		case UNOP_DEREF:
-			v.AddDerefConstraint(ann.Id, id)
+			// TODO: v.AddDerefConstraint(ann.Id, id)
 
 		}
 
@@ -376,7 +406,19 @@ func (v *NewInferer) HandleExpr(expr Expr) int {
 	case *AddressOfExpr:
 		aoe := expr.(*AddressOfExpr)
 		id := v.HandleExpr(aoe.Access)
-		v.AddPointerConstraint(ann.Id, id)
+		v.AddIsConstraint(ann.Id, pointerTo(&TypeVariable{Id: id}))
+
+	case *SizeofExpr:
+		soe := expr.(*SizeofExpr)
+		if soe.Expr != nil {
+			id := v.HandleExpr(soe.Expr)
+			_ = id
+		}
+		v.AddIsConstraint(ann.Id, PRIMITIVE_uint)
+
+	case *DefaultExpr:
+		de := expr.(*DefaultExpr)
+		v.AddIsConstraint(ann.Id, de.Type)
 
 	case *VariableAccessExpr:
 		vae := expr.(*VariableAccessExpr)
@@ -399,6 +441,10 @@ func (v *NewInferer) HandleExpr(expr Expr) int {
 		} else {
 			log.Debugln("inferer", "Struct access expr had nil type")
 		}
+
+	/*case *DerefAccessExpr:
+	dae := expr.(*DerefAccessExpr)
+	_ = dae.Expr*/
 
 	case *EnumLiteral:
 		// TODO: Infer type via constructor

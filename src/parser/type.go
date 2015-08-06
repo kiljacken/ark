@@ -687,8 +687,41 @@ func (v *EnumType) ActualType() Type {
 	return v
 }
 
+// MetaType
+type MetaType struct {
+}
+
+func (v *MetaType) IsSigned() bool {
+	panic("IsSigned() invalid on MetaType")
+}
+
+func (v *MetaType) LevelsOfIndirection() int {
+	panic("LevelsOfIndirection() invalid on MetaType")
+}
+
+func (v *MetaType) IsIntegerType() bool {
+	panic("IsIntegerType() invalid on MetaType")
+}
+
+func (v *MetaType) IsFloatingType() bool {
+	panic("IsFloatingType() invalid on MetaType")
+}
+
+func (v *MetaType) CanCastTo(t Type) bool {
+	panic("CanCastTo() invalid on MetaType")
+}
+
+func (v *MetaType) Attrs() AttrGroup {
+	panic("Attrs() invalid on MetaType")
+}
+
+func (v *MetaType) Equals(t Type) bool {
+	panic("Equals() invalid on MetaType")
+}
+
 // UnresolvedType
 type UnresolvedType struct {
+	MetaType
 	Name unresolvedName
 }
 
@@ -698,34 +731,6 @@ func (v *UnresolvedType) String() string {
 
 func (v *UnresolvedType) TypeName() string {
 	return v.Name.String()
-}
-
-func (v *UnresolvedType) IsSigned() bool {
-	panic("IsSigned() invalid on UnresolvedType")
-}
-
-func (v *UnresolvedType) LevelsOfIndirection() int {
-	panic("LevelsOfIndirection() invalid on UnresolvedType")
-}
-
-func (v *UnresolvedType) IsIntegerType() bool {
-	panic("IsIntegerType() invalid on UnresolvedType")
-}
-
-func (v *UnresolvedType) IsFloatingType() bool {
-	panic("IsFloatingType() invalid on UnresolvedType")
-}
-
-func (v *UnresolvedType) CanCastTo(t Type) bool {
-	panic("CanCastTo() invalid on UnresolvedType")
-}
-
-func (v *UnresolvedType) Attrs() AttrGroup {
-	panic("Attrs() invalid on UnresolvedType")
-}
-
-func (v *UnresolvedType) Equals(t Type) bool {
-	panic("Equals() invalid on UnresolvedType")
 }
 
 func (v *UnresolvedType) ActualType() Type {
