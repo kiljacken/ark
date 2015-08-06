@@ -5,177 +5,75 @@ import (
 	"github.com/ark-lang/ark/src/util/log"
 )
 
-type TypeCategory int
-
-const (
-	CAT_INTEGER TypeCategory = iota
-	CAT_NUMBER
-	CAT_POINTER
-)
-
-func (v TypeCategory) String() string {
-	switch v {
-	case CAT_INTEGER:
-		return "integer"
-	case CAT_NUMBER:
-		return "number"
-	case CAT_POINTER:
-		return "pointer"
-	}
-	panic("Invalid type category")
-}
-
 type AnnotatedExpr struct {
 	Expr Expr
 	Id   int
 }
 
-type TypeConstraint interface {
-	Substitute(a, b int)
-	String() string
-	Equals(other TypeConstraint) bool
-	Indirection() int
-	MainId() int
-}
+type SideType int
 
-type EqualsConstraint struct{ A, B int }
-type PointerConstraint struct{ A, B int }
-type DerefConstraint struct{ A, B int }
-type IsCategoryConstraint struct {
+const (
+	IdentSide SideType = iota
+	TypeSide
+	PointerSide
+	DerefSide
+)
+
+type Side struct {
 	Id       int
-	Category TypeCategory
-}
-type IsConstraint struct {
-	Id   int
-	Type Type
+	SideType SideType
+	Type     Type
 }
 
-func (v *EqualsConstraint) Substitute(a, b int) {
-	if v.A == a {
-		v.A = b
+func (v *Side) Subs(id int, left *Side) {
+	if v.SideType == IdentSide {
+		if v.Id == id {
+			*v = *left
+		}
+	} else if v.SideType == PointerSide {
+		if v.Id == id {
+			if left.SideType == TypeSide {
+				*v = *left
+				v.Type = pointerTo(v.Type)
+			} else {
+				v.Id = left.Id
+			}
+		}
 	}
-	if v.B == a {
-		v.B = b
+
+}
+
+func (v *Side) String() string {
+	switch v.SideType {
+	case IdentSide:
+		return fmt.Sprintf("$%d", v.Id)
+	case TypeSide:
+		return fmt.Sprintf("type `%s`", v.Type.TypeName())
+	case PointerSide:
+		return fmt.Sprintf("&$%d", v.Id)
+	case DerefSide:
+		return fmt.Sprintf("^$%d", v.Id)
 	}
+	panic("Invalid side type")
 }
 
-func (v *PointerConstraint) Substitute(a, b int) {
-	if v.A == a {
-		v.A = b
-	}
-	if v.B == a {
-		v.B = b
-	}
+type Constraint struct {
+	Left, Right *Side
 }
 
-func (v *DerefConstraint) Substitute(a, b int) {
-	if v.A == a {
-		v.A = b
-	}
-	if v.B == a {
-		v.B = b
-	}
+func (v *Constraint) String() string {
+	return fmt.Sprintf("%s = %s", v.Left, v.Right)
 }
 
-func (v *IsCategoryConstraint) Substitute(a, b int) {
-	if v.Id == a {
-		v.Id = b
-	}
-}
-
-func (v *IsConstraint) Substitute(a, b int) {
-	if v.Id == a {
-		v.Id = b
-	}
-}
-
-func (v *EqualsConstraint) String() string {
-	return fmt.Sprintf("$%d = $%d", v.A, v.B)
-}
-
-func (v *PointerConstraint) String() string {
-	return fmt.Sprintf("$%d is &$%d", v.A, v.B)
-}
-
-func (v *DerefConstraint) String() string {
-	return fmt.Sprintf("$%d is ^$%d", v.A, v.B)
-}
-
-func (v *IsCategoryConstraint) String() string {
-	return fmt.Sprintf("$%d is %v", v.Id, v.Category)
-}
-
-func (v *IsConstraint) String() string {
-	return fmt.Sprintf("$%d is `%s`", v.Id, v.Type.TypeName())
-}
-
-func (v *EqualsConstraint) Equals(other TypeConstraint) bool {
-	oec, ok := other.(*EqualsConstraint)
-	return ok && v.A == oec.A && v.B == oec.B
-}
-
-func (v *PointerConstraint) Equals(other TypeConstraint) bool {
-	opc, ok := other.(*PointerConstraint)
-	return ok && v.A == opc.A && v.B == opc.B
-}
-
-func (v *DerefConstraint) Equals(other TypeConstraint) bool {
-	odc, ok := other.(*DerefConstraint)
-	return ok && v.A == odc.A && v.B == odc.B
-}
-
-func (v *IsCategoryConstraint) Equals(other TypeConstraint) bool {
-	oc, ok := other.(*IsCategoryConstraint)
-	return ok && v.Id == oc.Id && v.Category == oc.Category
-}
-
-func (v *IsConstraint) Equals(other TypeConstraint) bool {
-	oic, ok := other.(*IsConstraint)
-	return ok && v.Id == oic.Id && v.Type.Equals(oic.Type)
-}
-
-func (v *EqualsConstraint) Indirection() int {
-	// Value doesn't matter
-	return -1
-}
-
-func (v *PointerConstraint) Indirection() int {
-	return 1
-}
-
-func (v *DerefConstraint) Indirection() int {
-	return 1
-}
-
-func (v *IsCategoryConstraint) Indirection() int {
-	return 2
-}
-
-func (v *IsConstraint) Indirection() int {
-	return 0
-}
-
-func (v *EqualsConstraint) MainId() int {
-	return v.A
-}
-func (v *PointerConstraint) MainId() int {
-	return v.A
-}
-func (v *DerefConstraint) MainId() int {
-	return v.A
-}
-func (v *IsCategoryConstraint) MainId() int {
-	return v.Id
-}
-func (v *IsConstraint) MainId() int {
-	return v.Id
+type Substitution struct {
+	Constraint
 }
 
 type NewInferer struct {
 	Module      *Module
 	Function    *Function
 	Exprs       []*AnnotatedExpr
-	Constraints []TypeConstraint
+	Constraints []*Constraint
 	IdCount     int
 }
 
@@ -185,99 +83,114 @@ func NewInferer_(mod *Module) *NewInferer {
 	}
 }
 
-func (v *NewInferer) AddConstraint(c TypeConstraint) {
+func (v *NewInferer) AddConstraint(c *Constraint) {
 	v.Constraints = append(v.Constraints, c)
-	//v.ConstraintMap[c.MainId()] = append(v.ConstraintMap[c.MainId()], c)
 }
 
 func (v *NewInferer) AddEqualsConstraint(a, b int) {
-	v.AddConstraint(&EqualsConstraint{A: a, B: b})
+	c := &Constraint{
+		Left:  &Side{Id: a, SideType: IdentSide},
+		Right: &Side{Id: b, SideType: IdentSide},
+	}
+	v.AddConstraint(c)
 }
 
 func (v *NewInferer) AddPointerConstraint(a, b int) {
-	v.AddConstraint(&PointerConstraint{A: a, B: b})
+	c := &Constraint{
+		Left:  &Side{Id: a, SideType: IdentSide},
+		Right: &Side{Id: b, SideType: PointerSide},
+	}
+	v.AddConstraint(c)
 }
 
 func (v *NewInferer) AddDerefConstraint(a, b int) {
-	v.AddConstraint(&DerefConstraint{A: a, B: b})
-}
-
-func (v *NewInferer) AddIsCategoryConstraint(id int, cat TypeCategory) {
-	v.AddConstraint(&IsCategoryConstraint{Id: id, Category: cat})
+	c := &Constraint{
+		Left:  &Side{Id: a, SideType: IdentSide},
+		Right: &Side{Id: b, SideType: DerefSide},
+	}
+	v.AddConstraint(c)
 }
 
 func (v *NewInferer) AddIsConstraint(id int, typ Type) {
-	v.AddConstraint(&IsConstraint{Id: id, Type: typ})
-}
-
-func (v *NewInferer) CullNils() {
-	newConstraints := make([]TypeConstraint, 0, len(v.Constraints))
-	for _, cons := range v.Constraints {
-		if cons != nil {
-			newConstraints = append(newConstraints, cons)
-		}
+	c := &Constraint{
+		Left:  &Side{Id: id, SideType: IdentSide},
+		Right: &Side{Type: typ, SideType: TypeSide},
 	}
-	v.Constraints = newConstraints
+	v.AddConstraint(c)
 }
 
-func (v *NewInferer) SubstituteEquals() {
-	for idx, c := range v.Constraints {
-		if eqc, ok := c.(*EqualsConstraint); ok {
-			v.Constraints[idx] = nil
+func (v *NewInferer) Unify() []*Substitution {
+	stack := make([]*Constraint, len(v.Constraints))
+	copy(stack, v.Constraints)
 
-			for _, cons := range v.Constraints {
-				if cons != nil {
-					cons.Substitute(eqc.A, eqc.B)
-				}
+	var substitutions []*Substitution
+
+	for len(stack) > 0 {
+		idx := len(stack) - 1
+
+		element := stack[idx]
+		stack = stack[:idx]
+		left, right := element.Left, element.Right
+
+		log.Debugln("inferer", "\nThe constraint: %s", element)
+
+		// 1. If X and Y are identical identifiers, do nothing.
+		if left.SideType == right.SideType {
+			var equal bool
+			switch left.SideType {
+			case IdentSide, PointerSide, DerefSide:
+				equal = (left.Id == right.Id)
+
+			case TypeSide:
+				equal = (left.Type.Equals(right.Type))
 			}
 
-			for _, expr := range v.Exprs {
-				if expr.Id == eqc.A {
-					expr.Id = eqc.B
-				}
+			if equal {
+				log.Debugln("inferer", "Case 1")
+				continue
 			}
 		}
-	}
 
-	v.CullNils()
-}
-
-func (v *NewInferer) RemoveDuplicates() {
-	for oi, c := range v.Constraints {
-		if c == nil {
+		// 2. If X is an identifier, replace all occurrences of X by Y both on the stack and in the substitution, and
+		// add X → Y to the substitution.
+		if left.SideType == IdentSide {
+			log.Debugln("inferer", "Case 2")
+			for _, cons := range stack {
+				cons.Left.Subs(left.Id, right)
+				cons.Right.Subs(left.Id, right)
+			}
+			for _, cons := range substitutions {
+				cons.Left.Subs(left.Id, right)
+				cons.Right.Subs(left.Id, right)
+			}
+			substitutions = append(substitutions, &Substitution{Constraint: *element})
 			continue
 		}
 
-		for ii, ic := range v.Constraints {
-			if oi == ii || ic == nil {
-				continue
+		// 3. If Y is an identifier, replace all occurrences of Y by X both on the stack and in the substitution, and
+		// add Y → X to the substitution.
+		if right.SideType == IdentSide {
+			log.Debugln("inferer", "Case 3")
+			for _, cons := range stack {
+				cons.Left.Subs(right.Id, left)
+				cons.Right.Subs(right.Id, left)
 			}
-
-			if c.Equals(ic) {
-				v.Constraints[ii] = nil
+			for _, cons := range substitutions {
+				cons.Left.Subs(right.Id, left)
+				cons.Right.Subs(right.Id, left)
 			}
-		}
-	}
-
-	v.CullNils()
-}
-
-func (v *NewInferer) PickMostSpecific() {
-	for _, c := range v.Constraints {
-		if c == nil {
+			substitutions = append(substitutions, &Substitution{Constraint: *element})
 			continue
 		}
-		for ii, ic := range v.Constraints {
-			if ic == nil || ic.MainId() != c.MainId() {
-				continue
-			}
-			if ic.Indirection() > c.Indirection() {
-				v.Constraints[ii] = nil
-			}
-		}
+
+		// 4. If X is of the form C(X_1, ..., X_n) for some constructor C, and Y is of the form C(Y_1, ..., Y_n) (i.e., it
+		// has the same constructor), then push X_i = Y_i for all 1 ≤ i ≤ n onto the stack.
+
+		// 5. Otherwise, X and Y do not unify. Report an error.
+		log.Errorln("inferer", "Constraint did not unify. This is an error")
 	}
 
-	v.CullNils()
+	return substitutions
 }
 
 func (v *NewInferer) EnterScope(s *Scope) {}
@@ -290,31 +203,15 @@ func (v *NewInferer) ExitScope(s *Scope) {
 			log.Debugln("inferer", "%s", v.Module.File.MarkSpan(ann.Expr.Pos()))
 		}
 
-		log.Debugln("inferer", "=== BEFORE SUBSTITUTION ===")
-		log.Debugln("inferer", "%d constraints", len(v.Constraints))
-		for _, con := range v.Constraints {
-			log.Debugln("inferer", "Constraint: %s", con.String())
+		log.Debugln("inferer", "=== CONSTRAINTS ===")
+		for _, cons := range v.Constraints {
+			log.Debugln("inferer", "Constraint: %s", cons)
 		}
 
-		v.SubstituteEquals()
-		log.Debugln("inferer", "=== AFTER SUBSTITUTION ===")
-		log.Debugln("inferer", "%d constraints", len(v.Constraints))
-		for _, con := range v.Constraints {
-			log.Debugln("inferer", "Constraint: %s", con.String())
-		}
-
-		v.RemoveDuplicates()
-		log.Debugln("inferer", "=== AFTER DEDUPLICATION ===")
-		log.Debugln("inferer", "%d constraints", len(v.Constraints))
-		for _, con := range v.Constraints {
-			log.Debugln("inferer", "Constraint: %s", con.String())
-		}
-
-		v.PickMostSpecific()
-		log.Debugln("inferer", "=== AFTER SPECIALIZATION ===")
-		log.Debugln("inferer", "%d constraints", len(v.Constraints))
-		for _, con := range v.Constraints {
-			log.Debugln("inferer", "Constraint: %s", con.String())
+		substitutions := v.Unify()
+		log.Debugln("inferer", "=== SUBSTITUTIONS ===")
+		for _, subs := range substitutions {
+			log.Debugln("inferer", "Substitution: %s", subs)
 		}
 	}
 }
@@ -408,23 +305,18 @@ func (v *NewInferer) HandleExpr(expr Expr) int {
 		case BINOP_EQ, BINOP_NOT_EQ, BINOP_GREATER, BINOP_LESS,
 			BINOP_GREATER_EQ, BINOP_LESS_EQ:
 			v.AddEqualsConstraint(a, b)
-			v.AddIsCategoryConstraint(a, CAT_NUMBER)
 			v.AddIsConstraint(ann.Id, PRIMITIVE_bool)
 
 		case BINOP_BIT_AND, BINOP_BIT_OR, BINOP_BIT_XOR:
 			v.AddEqualsConstraint(a, b)
-			v.AddIsCategoryConstraint(a, CAT_INTEGER)
 			v.AddEqualsConstraint(ann.Id, a)
 
 		case BINOP_ADD, BINOP_SUB, BINOP_MUL, BINOP_DIV, BINOP_MOD:
 			// TODO: These assumptions don't hold once we add operator overloading
 			v.AddEqualsConstraint(a, b)
-			v.AddIsCategoryConstraint(a, CAT_NUMBER)
 			v.AddEqualsConstraint(ann.Id, a)
 
 		case BINOP_BIT_LEFT, BINOP_BIT_RIGHT:
-			v.AddIsCategoryConstraint(a, CAT_INTEGER)
-			v.AddIsCategoryConstraint(b, CAT_INTEGER)
 			v.AddEqualsConstraint(ann.Id, a)
 
 		case BINOP_LOG_AND, BINOP_LOG_OR:
@@ -446,15 +338,12 @@ func (v *NewInferer) HandleExpr(expr Expr) int {
 			v.AddIsConstraint(ann.Id, PRIMITIVE_bool)
 
 		case UNOP_BIT_NOT:
-			v.AddIsCategoryConstraint(id, CAT_INTEGER)
 			v.AddEqualsConstraint(ann.Id, id)
 
 		case UNOP_NEGATIVE:
-			v.AddIsCategoryConstraint(id, CAT_NUMBER)
 			v.AddEqualsConstraint(ann.Id, id)
 
 		case UNOP_DEREF:
-			v.AddIsCategoryConstraint(id, CAT_POINTER)
 			v.AddDerefConstraint(ann.Id, id)
 
 		}
@@ -488,7 +377,6 @@ func (v *NewInferer) HandleExpr(expr Expr) int {
 		aoe := expr.(*AddressOfExpr)
 		id := v.HandleExpr(aoe.Access)
 		v.AddPointerConstraint(ann.Id, id)
-		v.AddIsCategoryConstraint(ann.Id, CAT_POINTER)
 
 	case *VariableAccessExpr:
 		vae := expr.(*VariableAccessExpr)
@@ -504,11 +392,28 @@ func (v *NewInferer) HandleExpr(expr Expr) int {
 			log.Debugln("inferer", "Struct access expr had nil type")
 		}
 
+	case *ArrayAccessExpr:
+		aae := expr.(*ArrayAccessExpr)
+		if aae.Array.GetType() != nil {
+			v.AddIsConstraint(ann.Id, aae.Array.GetType().ActualType().(ArrayType).MemberType)
+		} else {
+			log.Debugln("inferer", "Struct access expr had nil type")
+		}
+
+	case *EnumLiteral:
+		// TODO: Infer type via constructor
+		el := expr.(*EnumLiteral)
+		if el.Type != nil {
+			v.AddIsConstraint(ann.Id, el.Type)
+		} else {
+			log.Debugln("inferer", "Enum literal had nil type")
+		}
+
 	case *BoolLiteral:
 		v.AddIsConstraint(ann.Id, PRIMITIVE_bool)
 
 	case *NumericLiteral:
-		v.AddIsCategoryConstraint(ann.Id, CAT_NUMBER)
+		// TODO: Set type here?
 
 	case *StringLiteral:
 		v.AddIsConstraint(ann.Id, PRIMITIVE_str)
@@ -517,8 +422,78 @@ func (v *NewInferer) HandleExpr(expr Expr) int {
 		v.AddIsConstraint(ann.Id, PRIMITIVE_rune)
 
 	default:
-		log.Debugln("inferer", "Unhandled expression type `%T`", expr)
+		log.Errorln("inferer", "Unhandled expression type `%T`", expr)
 	}
 
 	return ann.Id
 }
+
+/*func (v *NewInferer) CullNils() {
+	newConstraints := make([]*Constraint, 0, len(v.Constraints))
+	for _, cons := range v.Constraints {
+		if cons != nil {
+			newConstraints = append(newConstraints, cons)
+		}
+	}
+	v.Constraints = newConstraints
+}
+
+func (v *NewInferer) SubstituteEquals() {
+	for idx, c := range v.Constraints {
+		if eqc, ok := c.(*EqualsConstraint); ok {
+			v.Constraints[idx] = nil
+
+			for _, cons := range v.Constraints {
+				if cons != nil {
+					cons.Substitute(eqc.A, eqc.B)
+				}
+			}
+
+			for _, expr := range v.Exprs {
+				if expr.Id == eqc.A {
+					expr.Id = eqc.B
+				}
+			}
+		}
+	}
+
+	v.CullNils()
+}
+
+func (v *NewInferer) RemoveDuplicates() {
+	for oi, c := range v.Constraints {
+		if c == nil {
+			continue
+		}
+
+		for ii, ic := range v.Constraints {
+			if oi == ii || ic == nil {
+				continue
+			}
+
+			if c.Equals(ic) {
+				v.Constraints[ii] = nil
+			}
+		}
+	}
+
+	v.CullNils()
+}
+
+func (v *NewInferer) PickMostSpecific() {
+	for _, c := range v.Constraints {
+		if c == nil {
+			continue
+		}
+		for ii, ic := range v.Constraints {
+			if ic == nil || ic.MainId() != c.MainId() {
+				continue
+			}
+			if ic.Indirection() > c.Indirection() {
+				v.Constraints[ii] = nil
+			}
+		}
+	}
+
+	v.CullNils()
+}*/
