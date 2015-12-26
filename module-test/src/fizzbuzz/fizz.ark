@@ -1,0 +1,7 @@
+func should_fizz(i: int) -> bool {
+	return i % 3 == 0;
+}
+
+func fizz() -> str {
+	return "Fizz";
+}

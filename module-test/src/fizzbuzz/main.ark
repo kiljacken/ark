@@ -1,0 +1,31 @@
+use buzzer;
+
+[c] func printf(fmt: str, ...) -> int;
+[c] func putchar(c: s8);
+
+func main() -> int {
+	mut i := 1;
+
+    for i <= 100 {
+    	fizzy := should_fizz(i);
+    	buzzy := buzz::should_buzz(i);
+
+        if fizzy {
+            C::printf(fizz());
+        }
+
+        if buzzy {
+            C::printf(buzz::buzz());
+        }
+
+        if !(fizzy || buzzy) {
+            C::printf("%d", i);
+        }
+
+        C::putchar(s8('\n'));
+
+        i += 1;
+    }
+
+	return 0;
+}

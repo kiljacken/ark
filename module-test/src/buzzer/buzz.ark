@@ -1,0 +1,7 @@
+func should_buzz(i: int) -> bool {
+	return i % 5 == 0;
+}
+
+func buzz() -> str {
+	return "Buzz";
+}
